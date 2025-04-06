@@ -3,22 +3,21 @@
 namespace App\Services;
 
 use App\Exceptions\InternalServerErrorException;
-use App\Exceptions\UrlNotFoundException;
 use App\Models\Url;
 use App\Repositories\Interfaces\UrlRepositoryInterface;
 use App\Services\Interfaces\UrlServiceInterface;
-use Exception;
+use App\Traits\HandlesUrlExceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
-class UrlService implements UrlServiceInterface
+readonly class UrlService implements UrlServiceInterface
 {
-    protected UrlRepositoryInterface $urlRepository;
-
-    public function __construct(UrlRepositoryInterface $urlRepository)
+    use HandlesUrlExceptions;
+    public function __construct(
+        private UrlRepositoryInterface $urlRepository
+    )
     {
-        $this->urlRepository = $urlRepository;
     }
 
     /**
@@ -27,56 +26,22 @@ class UrlService implements UrlServiceInterface
      */
     public function store(string $originalUrl): Url
     {
-        try {
-            $originalUrl = $this->formatUrl($originalUrl);
-            $alias = $this->generateUniqueAlias();
+        $originalUrl = $this->formatUrl($originalUrl);
+        $alias = $this->generateUniqueAlias();
 
+        return $this->handleServiceExceptions(function () use ($originalUrl, $alias) {
             return $this->urlRepository->create($originalUrl, $alias);
-        } catch (InvalidArgumentException $e) {
-            Log::warning("Invalid URL format", [
-                'url' => $originalUrl,
-                'message' => $e->getMessage()
-            ]);
-            throw $e;
-        } catch (InternalServerErrorException $e) {
-            Log::error("Repository error while storing URL", [
-                'url' => $originalUrl,
-                'message' => $e->getMessage()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error("Unexpected error while storing URL", [
-                'url' => $originalUrl,
-                'message' => $e->getMessage()
-            ]);
-            throw new InternalServerErrorException('Failed to create short URL');
-        }
+        }, $originalUrl);
     }
 
     /**
-     * @throws UrlNotFoundException
      * @throws InternalServerErrorException
      */
     public function show(string $alias): Url
     {
-        try {
+        return $this->handleServiceExceptions(function () use ($alias) {
             return $this->urlRepository->findByAlias($alias);
-        } catch (UrlNotFoundException $e) {
-            Log::warning("URL not found", ['alias' => $alias]);
-            throw $e;
-        } catch (InternalServerErrorException $e) {
-            Log::error("Repository error while retrieving URL", [
-                'alias' => $alias,
-                'message' => $e->getMessage()
-            ]);
-            throw $e;
-        } catch (Exception $e) {
-            Log::error("Unexpected error while retrieving URL", [
-                'alias' => $alias,
-                'message' => $e->getMessage()
-            ]);
-            throw new InternalServerErrorException('Failed to retrieve URL');
-        }
+        }, $alias);
     }
 
     /**
@@ -106,18 +71,11 @@ class UrlService implements UrlServiceInterface
         $attempt = 0;
 
         do {
-            try {
-                $alias = Str::random(4);
-                $exists = $this->urlRepository->aliasExists($alias);
-                $attempt++;
-            } catch (InternalServerErrorException $e) {
-                Log::error("Failed to check alias existence", [
-                    'alias' => $alias,
-                    'attempt' => $attempt,
-                    'message' => $e->getMessage()
-                ]);
-                throw $e;
-            }
+            $alias = Str::random(4);
+            $attempt++;
+            $exists = $this->handleServiceExceptions(function () use ($alias) {
+                return $this->urlRepository->aliasExists($alias);
+            }, $alias);
         } while ($exists && $attempt < $maxAttempts);
 
         if ($attempt >= $maxAttempts) {
@@ -127,4 +85,6 @@ class UrlService implements UrlServiceInterface
 
         return $alias;
     }
+
+
 }

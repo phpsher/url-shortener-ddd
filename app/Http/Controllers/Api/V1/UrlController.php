@@ -2,21 +2,18 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Exceptions\InternalServerErrorException;
-use App\Exceptions\UrlNotFoundException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUrlRequest;
+use App\Http\Resources\UrlResource;
 use App\Services\Interfaces\UrlServiceInterface;
-use App\Services\UrlService;
-use Exception;
+use App\Traits\HandlesUrlExceptions;
+use App\Traits\Response;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Log;
-use InvalidArgumentException;
 
 /**
  * @OA\Info(
- *     version="1.0.0",
+ *     version="1",
  *     title="URL Shortener API",
  *     description="API for shortening URLs"
  * )
@@ -33,11 +30,12 @@ use InvalidArgumentException;
  */
 class UrlController extends Controller
 {
-    protected UrlServiceInterface $urlService;
+    use Response, HandlesUrlExceptions;
 
-    public function __construct(UrlService $urlService)
+    public function __construct(
+        private readonly UrlServiceInterface $urlService
+    )
     {
-        $this->urlService = $urlService;
     }
 
     /**
@@ -81,41 +79,11 @@ class UrlController extends Controller
      */
     public function store(StoreUrlRequest $request): JsonResponse
     {
-        try {
+        return $this->handleControllerExceptions(function () use ($request) {
             $urlData = $this->urlService->store($request->validated('original_url'));
 
-            return response()->json([
-                'original_url' => $urlData->original_url,
-                'short_url' => env('APP_URL') . $urlData->alias,
-            ]);
-        } catch (InvalidArgumentException $e) {
-            Log::warning('Invalid URL format provided', [
-                'url' => $request->validated('original_url'),
-                'message' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'error' => 'Invalid URL format',
-                'message' => $e->getMessage()
-            ], 422);
-        } catch (InternalServerErrorException $e) {
-            Log::error('Failed to create short URL', [
-                'url' => $request->validated('original_url'),
-                'message' => $e->getMessage()
-            ]);
-
-            return $e->render();
-        } catch (Exception $e) {
-            Log::error('Unexpected error while creating short URL', [
-                'url' => $request->validated('original_url'),
-                'message' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'error' => 'Internal Server Error',
-                'message' => 'An unexpected error occurred'
-            ], 500);
-        }
+            return $this->successResponse(new UrlResource($urlData));
+        }, $request->validated('original_url'));
     }
 
     /**
@@ -153,36 +121,11 @@ class UrlController extends Controller
      *     )
      * )
      */
-    public function show(string $alias): RedirectResponse|JsonResponse
+    public function show(string $alias): RedirectResponse
     {
-        try {
+        return $this->handleControllerExceptions(function () use ($alias) {
             $url = $this->urlService->show($alias);
-
             return redirect()->away($url->original_url);
-        } catch (UrlNotFoundException $e) {
-            Log::warning('URL not found', [
-                'alias' => $alias,
-                'message' => $e->getMessage()
-            ]);
-
-            return $e->render();
-        } catch (InternalServerErrorException $e) {
-            Log::error('Failed to retrieve URL', [
-                'alias' => $alias,
-                'message' => $e->getMessage()
-            ]);
-
-            return $e->render();
-        } catch (Exception $e) {
-            Log::error('Unexpected error while retrieving URL', [
-                'alias' => $alias,
-                'message' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'error' => 'Internal Server Error',
-                'message' => 'An unexpected error occurred'
-            ], 500);
-        }
+        }, $alias);
     }
 }

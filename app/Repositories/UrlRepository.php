@@ -61,8 +61,6 @@ class UrlRepository implements UrlRepositoryInterface
                 'exception' => $e
             ]);
             throw new InternalServerErrorException('Failed to retrieve URL');
-        } catch (UrlNotFoundException $e) {
-            throw $e;
         } catch (Exception $e) {
             Log::error("Unexpected error in UrlRepository::findByAlias: " . $e->getMessage(), [
                 'alias' => $alias,

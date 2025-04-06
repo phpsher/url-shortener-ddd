@@ -23,8 +23,8 @@ class UrlTest extends TestCase
             'original_url' => 'https://youtube.com',
         ]);
 
-        $this->assertNotNull($response['short_url']);
-        $this->assertStringStartsWith(env('APP_URL'), $response['short_url']);
+        $this->assertNotNull($response['data']['short_url']);
+        $this->assertStringStartsWith(env('APP_URL'), $response['data']['short_url']);
     }
 
     public function testShowUrlRedirectsToOriginalUrl()
