@@ -2,46 +2,35 @@
 
 namespace App\Services;
 
+use App\Contracts\Services\UrlServiceContract;
 use App\Exceptions\InternalServerErrorException;
+use App\Exceptions\UrlNotFoundException;
+use App\Models\Click;
 use App\Models\Url;
-use App\Repositories\Interfaces\UrlRepositoryInterface;
-use App\Services\Interfaces\UrlServiceInterface;
-use App\Traits\HandlesUrlExceptions;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Throwable;
 
-readonly class UrlService implements UrlServiceInterface
+readonly class UrlService implements UrlServiceContract
 {
-    use HandlesUrlExceptions;
-    public function __construct(
-        private UrlRepositoryInterface $urlRepository
-    )
-    {
-    }
-
     /**
+     * @param string $originalUrl
+     * @return Url
      * @throws InternalServerErrorException
-     * @throws InvalidArgumentException
      */
     public function store(string $originalUrl): Url
     {
-        $originalUrl = $this->formatUrl($originalUrl);
-        $alias = $this->generateUniqueAlias();
+        try {
+            $originalUrl = $this->formatUrl($originalUrl);
+            $alias = $this->generateUniqueAlias();
 
-        return $this->handleServiceExceptions(function () use ($originalUrl, $alias) {
-            return $this->urlRepository->create($originalUrl, $alias);
-        }, $originalUrl);
-    }
-
-    /**
-     * @throws InternalServerErrorException
-     */
-    public function show(string $alias): Url
-    {
-        return $this->handleServiceExceptions(function () use ($alias) {
-            return $this->urlRepository->findByAlias($alias);
-        }, $alias);
+            return Url::create([
+                'original_url' => $originalUrl,
+                'alias' => $alias,
+            ]);
+        } catch (Throwable $e) {
+            throw new InternalServerErrorException($e->getMessage());
+        }
     }
 
     /**
@@ -73,18 +62,47 @@ readonly class UrlService implements UrlServiceInterface
         do {
             $alias = Str::random(4);
             $attempt++;
-            $exists = $this->handleServiceExceptions(function () use ($alias) {
-                return $this->urlRepository->aliasExists($alias);
-            }, $alias);
+            $exists = Url::where('alias', $alias)
+                ->exists();
         } while ($exists && $attempt < $maxAttempts);
 
         if ($attempt >= $maxAttempts) {
-            Log::error("Max attempts reached while generating unique alias");
             throw new InternalServerErrorException('Failed to generate unique alias');
         }
 
         return $alias;
     }
 
+    /**
+     * @param string $alias
+     * @param string $ip
+     * @return Url
+     * @throws InternalServerErrorException
+     */
+    public function show(
+        string $alias,
+        string $ip,
+    ): Url
+    {
+        try {
+            $url = Url::where('alias', $alias)
+                ->firstOrFail();
 
+
+            $click = Click::where('url_id', $url->id)
+                ->where('ip', $ip)
+                ->exists();
+
+            if (!$click) {
+                Click::create([
+                    'url_id' => $url->id,
+                    'ip' => $ip
+                ]);
+            }
+
+            return $url;
+        } catch (Throwable $e) {
+            throw new InternalServerErrorException($e->getMessage());
+        }
+    }
 }

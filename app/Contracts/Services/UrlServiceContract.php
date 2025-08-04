@@ -8,7 +8,7 @@ interface UrlServiceContract
 {
     public function store(string $originalUrl): Url;
 
-    public function show(string $alias): Url;
+    public function show(string $alias, string $ip): Url;
 
     public function formatUrl(string $url): string;
 

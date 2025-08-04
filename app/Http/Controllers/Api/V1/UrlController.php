@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Contracts\Services\UrlServiceContract;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUrlRequest;
 use App\Http\Resources\UrlResource;
-use App\Services\Interfaces\UrlServiceInterface;
-use App\Traits\HandlesUrlExceptions;
-use App\Traits\Response;
+use App\Traits\ResponseTrait;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 /**
  * @OA\Info(
@@ -30,10 +29,10 @@ use Illuminate\Http\RedirectResponse;
  */
 class UrlController extends Controller
 {
-    use Response, HandlesUrlExceptions;
+    use ResponseTrait;
 
     public function __construct(
-        private readonly UrlServiceInterface $urlService
+        private readonly UrlServiceContract $urlService
     )
     {
     }
@@ -51,7 +50,7 @@ class UrlController extends Controller
      *             @OA\Property(property="original_url", type="string", format="url", example="https://example.com")
      *         )
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=200,
      *         description="URL shortened successfully",
      *         @OA\JsonContent(
@@ -59,7 +58,7 @@ class UrlController extends Controller
      *             @OA\Property(property="short_url", type="string", example="http://localhost/abc123")
      *         )
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=422,
      *         description="Invalid URL format",
      *         @OA\JsonContent(
@@ -67,7 +66,7 @@ class UrlController extends Controller
      *             @OA\Property(property="message", type="string", example="The URL format is invalid")
      *         )
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=500,
      *         description="Internal server error",
      *         @OA\JsonContent(
@@ -79,16 +78,19 @@ class UrlController extends Controller
      */
     public function store(StoreUrlRequest $request): JsonResponse
     {
-        return $this->handleControllerExceptions(function () use ($request) {
-            $urlData = $this->urlService->store($request->validated('original_url'));
+        $urlData = $this->urlService->store(
+            $request->input('original_url'),
+        );
 
-            return $this->successResponse(new UrlResource($urlData));
-        }, $request->validated('original_url'));
+        return $this->success(
+            data: new UrlResource($urlData),
+            statusCode: 201
+        );
     }
 
     /**
      * @OA\Get(
-     *     path="/{alias}",
+     *     path="/api/v1/{alias}",
      *     operationId="showUrl",
      *     summary="Redirect to original URL",
      *     tags={"URLs"},
@@ -99,11 +101,11 @@ class UrlController extends Controller
      *         description="Short URL alias",
      *         @OA\Schema(type="string", example="abc123")
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=302,
      *         description="Redirect to original URL"
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=404,
      *         description="URL not found",
      *         @OA\JsonContent(
@@ -111,7 +113,7 @@ class UrlController extends Controller
      *             @OA\Property(property="message", type="string", example="URL not found")
      *         )
      *     ),
-     *     @OA\Response(
+     *     @OA\ResponseTrait(
      *         response=500,
      *         description="Internal server error",
      *         @OA\JsonContent(
@@ -121,11 +123,18 @@ class UrlController extends Controller
      *     )
      * )
      */
-    public function show(string $alias): RedirectResponse
+    public function show(Request $request, string $alias): JsonResponse
     {
-        return $this->handleControllerExceptions(function () use ($alias) {
-            $url = $this->urlService->show($alias);
-            return redirect()->away($url->original_url);
-        }, $alias);
+        $url = $this->urlService->show(
+            $alias,
+            $request->ip(),
+        );
+
+
+        return $this->success(
+            data: [
+                'redirect_url' => $url->original_url,
+            ],
+        );
     }
 }

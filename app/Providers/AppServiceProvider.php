@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Contracts\Services\UrlServiceContract;
+use App\Services\UrlService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,14 +13,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(
-            \App\Repositories\Interfaces\UrlRepositoryInterface::class,
-            \App\Repositories\UrlRepository::class
-        );
 
         $this->app->bind(
-            \App\Services\Interfaces\UrlServiceInterface::class,
-            \App\Services\UrlService::class
+            UrlServiceContract::class,
+            UrlService::class
         );
     }
 
