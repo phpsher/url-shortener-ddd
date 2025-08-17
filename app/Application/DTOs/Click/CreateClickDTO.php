@@ -1,0 +1,13 @@
+<?php
+
+namespace App\Application\DTOs\Click;
+
+class CreateClickDTO
+{
+    public function __construct(
+        public string $url_id,
+        public string $ip,
+    )
+    {
+    }
+}

@@ -1,7 +1,5 @@
 <?php
 
-use App\Exceptions\InternalServerErrorException;
-use App\Exceptions\UrlNotFoundException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;

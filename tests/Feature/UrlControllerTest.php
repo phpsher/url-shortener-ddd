@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Url;
+use App\Infrastructure\Persistence\Url\Models\UrlModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Request;
 use Tests\TestCase;
@@ -11,12 +11,12 @@ class UrlControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Url $url;
+    private UrlModel $url;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->url = Url::factory()->create();
+        $this->url = UrlModel::factory()->create();
     }
 
     public function testStoreUrlSuccessfully()
@@ -42,7 +42,6 @@ class UrlControllerTest extends TestCase
     {
         $this->get('/api/v1/urls/' . $this->url->alias)
             ->assertJsonStructure([
-                'message',
                 'data' => [
                     'redirect_url'
                 ]
